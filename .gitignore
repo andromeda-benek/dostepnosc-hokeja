@@ -1,0 +1,10 @@
+*
+
+!.gitignore
+!.nojekyll
+!index.html
+!styles.css
+!app.js
+!data/
+data/*
+!data/harmonogram.csv
