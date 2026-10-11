@@ -24,13 +24,25 @@
   function hoursBetween(from, to) {
     return (new Date(to).getTime() - new Date(from).getTime()) / 36e5;
   }
-  function findEventsInWindow(events, centerDateTime, { hockey, hours = 24 } = {}) {
-    const center = new Date(centerDateTime).getTime();
-    const radius = hours * 36e5;
+  function isIndividualEntry(event) {
+    return event.organizer.trim().toLocaleLowerCase("pl") === "samodzielnie";
+  }
+  function findEventsInWindow(events, fromDateTime, { hockey, hours = 72 } = {}) {
+    const from = new Date(fromDateTime).getTime();
+    const until = from + hours * 36e5;
     return events.filter((event) => !hockey || event.hockey === hockey).filter((event) => {
       const start = new Date(eventDateTime(event)).getTime();
-      return start >= center - radius && start <= center + radius;
+      return start >= from && start <= until;
     }).sort((a, b) => eventDateTime(a).localeCompare(eventDateTime(b)));
+  }
+  function selectEventsForDisplay(events, fromDateTime, options = {}) {
+    let includedIndividualEntry = false;
+    return findEventsInWindow(events, fromDateTime, options).filter((event) => {
+      if (!isIndividualEntry(event)) return true;
+      if (includedIndividualEntry) return false;
+      includedIndividualEntry = true;
+      return true;
+    });
   }
   function effectiveEventEnd(event, sunset) {
     if (event.hockey !== "roller" || !sunset || !sunset.startsWith(event.date)) return event.end;
@@ -39,9 +51,11 @@
   }
   function evaluateEvent({ event, venue, weather, sunset }) {
     var _a, _b, _c, _d, _e;
-    const reasons = [];
+    const reasons = isIndividualEntry(event) ? [] : [{
+      code: "public-training",
+      message: "Trening og\xF3lnodost\u0119pny, sprawd\u017A szczeg\xF3\u0142y u organizatora"
+    }];
     if (venue.surface === "indoor") {
-      reasons.push({ code: "indoor", message: "Obiekt kryty \u2014 pogoda nie wp\u0142ywa na trening." });
       return { status: "yes", reasons, effectiveEnd: event.end };
     }
     const startDateTime = eventDateTime(event);
@@ -90,7 +104,8 @@
       reasons.push({ code: "light-precipitation", message: "Mo\u017Cliwe s\u0105 lekkie opady na odkrytym lodowisku." });
       return { status: "warning", reasons, effectiveEnd: event.end };
     }
-    return { status: "yes", reasons: [{ code: "weather-ok", message: "Prognoza nie wskazuje istotnych opad\xF3w." }], effectiveEnd: event.end };
+    reasons.push({ code: "weather-ok", message: "Prognoza nie wskazuje istotnych opad\xF3w." });
+    return { status: "yes", reasons, effectiveEnd: event.end };
   }
 
   // src/weather.mjs
@@ -248,7 +263,7 @@
   var schedule;
   var STATUS = {
     yes: { label: "Mo\u017Cna gra\u0107", className: "yes" },
-    warning: { label: "Sprawd\u017A ostrze\u017Cenia", className: "warning" },
+    warning: { label: "Mo\u017Cna gra\u0107 \u2014 zobacz uwag\u0119", className: "warning" },
     no: { label: "Warunki nie pozwalaj\u0105", className: "no" },
     unknown: { label: "Brak pe\u0142nych danych", className: "unknown" }
   };
@@ -322,7 +337,9 @@
       note.textContent = event.notes;
       meta.append(note);
     }
-    card.append(top, title, venue, reasons, meta);
+    card.append(top, title, venue);
+    if (reasons.children.length) card.append(reasons);
+    card.append(meta);
     return card;
   }
   async function weatherForEvents(events) {
@@ -345,17 +362,17 @@
     if (last >= 2 && last <= 4 && !(lastTwo >= 12 && lastTwo <= 14)) return `${count} dost\u0119pne terminy`;
     return `${count} dost\u0119pnych termin\xF3w`;
   }
-  async function showEvents(centerDateTime, hockey) {
-    const events = findEventsInWindow(schedule.events, centerDateTime, { hockey });
+  async function showEvents(fromDateTime, hockey) {
+    const events = selectEventsForDisplay(schedule.events, fromDateTime, { hockey });
     result.hidden = false;
     resultTitle.textContent = resultCountLabel(events.length);
-    const center = new Date(centerDateTime);
-    resultWindow.textContent = `${formatMoment(new Date(center.getTime() - 864e5))} \u2014 ${formatMoment(new Date(center.getTime() + 864e5))}`;
+    const from = new Date(fromDateTime);
+    resultWindow.textContent = `${formatMoment(from)} \u2014 ${formatMoment(new Date(from.getTime() + 72 * 36e5))}`;
     eventsList.replaceChildren();
     if (!events.length) {
       const empty = document.createElement("div");
       empty.className = "empty-state";
-      empty.textContent = "W tym 48-godzinnym oknie nie ma wpisanych termin\xF3w.";
+      empty.textContent = "W ci\u0105gu najbli\u017Cszych 72 godzin nie ma wpisanych termin\xF3w.";
       eventsList.append(empty);
       return;
     }
