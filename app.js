@@ -367,6 +367,7 @@
   }
   function resultCountLabel(count) {
     if (count === 1) return "1 dost\u0119pny termin";
+    if (count === 0) return "Brak dost\u0119pnych termin\xF3w :(";
     const lastTwo = count % 100;
     const last = count % 10;
     if (last >= 2 && last <= 4 && !(lastTwo >= 12 && lastTwo <= 14)) return `${count} dost\u0119pne terminy`;
@@ -382,7 +383,7 @@
     if (!events.length) {
       const empty = document.createElement("div");
       empty.className = "empty-state";
-      empty.textContent = "W ci\u0105gu najbli\u017Cszych 72 godzin nie ma wpisanych termin\xF3w.";
+      empty.textContent = "Mamy za ma\u0142o lodowisk, nie mamy krytych rolkowisk, wi\u0119c obecnie nie ma dzie gra\u0107...";
       eventsList.append(empty);
       return;
     }
