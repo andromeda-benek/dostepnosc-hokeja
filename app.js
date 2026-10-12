@@ -383,7 +383,7 @@
     if (!events.length) {
       const empty = document.createElement("div");
       empty.className = "empty-state";
-      empty.textContent = "Mamy za ma\u0142o lodowisk, nie mamy krytych rolkowisk, wi\u0119c obecnie nie ma dzie gra\u0107...";
+      empty.textContent = "Mamy za ma\u0142o lodowisk, nie mamy krytych rolkowisk, wi\u0119c obecnie nie ma gdzie gra\u0107...";
       eventsList.append(empty);
       return;
     }
