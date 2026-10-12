@@ -24,6 +24,12 @@
   function hoursBetween(from, to) {
     return (new Date(to).getTime() - new Date(from).getTime()) / 36e5;
   }
+  function addForecastFollowUp(reasons) {
+    reasons.push({ code: "forecast-follow-up", message: "Warunki mog\u0105 si\u0119 zmieni\u0107. \u015Aled\u017A bie\u017C\u0105ce prognozy przed wyjazdem." });
+  }
+  function addSafeWeather(reasons) {
+    reasons.push({ code: "weather-safe", message: "Prognoza na ten termin wskazuje bezpieczne warunki pogodowe." });
+  }
   function isIndividualEntry(event) {
     return event.organizer.trim().toLocaleLowerCase("pl") === "samodzielnie";
   }
@@ -58,17 +64,19 @@
     const startDateTime = eventDateTime(event);
     const current = selectedWeather(weather, startDateTime);
     if (!current) {
-      reasons.push({ code: "weather-missing", message: "Brak prognozy dla pocz\u0105tku tego terminu." });
+      reasons.push({ code: "weather-missing", message: "Brak prognozy dla pocz\u0105tku tego terminu. \u015Aled\u017A bie\u017C\u0105ce prognozy przed wyjazdem." });
       return { status: "unknown", reasons, effectiveEnd: event.end };
     }
     if (event.hockey === "roller") {
       const end = effectiveEventEnd(event, sunset);
       if (sunset && new Date(startDateTime).getTime() >= new Date(sunset).getTime()) {
+        addSafeWeather(reasons);
         reasons.push({ code: "after-sunset", message: "Termin zaczyna si\u0119 po zachodzie s\u0142o\u0144ca." });
         return { status: "no", reasons, effectiveEnd: end };
       }
       if (((_a = current.precipitation) != null ? _a : 0) > 0.1) {
         reasons.push({ code: "rain-now", message: "Na pocz\u0105tku terminu prognozowane s\u0105 opady." });
+        addForecastFollowUp(reasons);
         return { status: "no", reasons, effectiveEnd: end };
       }
       const previousWet = lastWetHour(weather, startDateTime);
@@ -78,30 +86,35 @@
         const dryingHours = heavy || cloudy ? 12 : 4;
         if (hoursBetween(previousWet.time, startDateTime) < dryingHours) {
           reasons.push({ code: "surface-drying", message: `Nawierzchnia mo\u017Ce schn\u0105\u0107 przez ${dryingHours} godz. od ostatnich opad\xF3w.` });
+          addForecastFollowUp(reasons);
           return { status: "no", reasons, effectiveEnd: end };
         }
       }
       if (((_d = current.temperature) != null ? _d : -Infinity) > 35) {
         reasons.push({ code: "heat-warning", message: "Temperatura przekracza 35\xB0C." });
+        addForecastFollowUp(reasons);
         return { status: "warning", reasons, effectiveEnd: end };
       }
       if (end !== event.end) {
+        addSafeWeather(reasons);
         reasons.push({ code: "daylight-limit", message: `Gra mo\u017Cliwa najp\xF3\u017Aniej do zachodu s\u0142o\u0144ca o ${end}.` });
         return { status: "warning", reasons, effectiveEnd: end };
       }
-      reasons.push({ code: "weather-ok", message: "Na pocz\u0105tku terminu prognoza nie wskazuje opad\xF3w." });
+      addSafeWeather(reasons);
       return { status: "yes", reasons, effectiveEnd: end };
     }
     const precipitation = (_e = current.precipitation) != null ? _e : 0;
     if (precipitation >= 4) {
       reasons.push({ code: "weather-block", message: "Na odkrytym lodowisku prognozowane s\u0105 obfite opady." });
+      addForecastFollowUp(reasons);
       return { status: "no", reasons, effectiveEnd: event.end };
     }
     if (precipitation > 0.1) {
       reasons.push({ code: "light-precipitation", message: "Mo\u017Cliwe s\u0105 lekkie opady na odkrytym lodowisku." });
+      addForecastFollowUp(reasons);
       return { status: "warning", reasons, effectiveEnd: event.end };
     }
-    reasons.push({ code: "weather-ok", message: "Prognoza nie wskazuje istotnych opad\xF3w." });
+    addSafeWeather(reasons);
     return { status: "yes", reasons, effectiveEnd: event.end };
   }
 
@@ -377,7 +390,7 @@
     for (const event of events) {
       const venue = schedule.venues[event.venue];
       const weatherData = weatherByDate.get(event.date);
-      const evaluation = (weatherData == null ? void 0 : weatherData.error) ? { status: "unknown", reasons: [{ message: `Nie uda\u0142o si\u0119 pobra\u0107 prognozy: ${weatherData.error.message}` }], effectiveEnd: event.end } : evaluateEvent({ event, venue, weather: weatherData, sunset: weatherData == null ? void 0 : weatherData.sunset });
+      const evaluation = (weatherData == null ? void 0 : weatherData.error) ? { status: "unknown", reasons: [{ message: `Nie uda\u0142o si\u0119 pobra\u0107 prognozy: ${weatherData.error.message}. \u015Aled\u017A bie\u017C\u0105ce prognozy przed wyjazdem.` }], effectiveEnd: event.end } : evaluateEvent({ event, venue, weather: weatherData, sunset: weatherData == null ? void 0 : weatherData.sunset });
       eventsList.append(makeEventCard(event, evaluation));
     }
     result.scrollIntoView({ behavior: "smooth", block: "start" });
